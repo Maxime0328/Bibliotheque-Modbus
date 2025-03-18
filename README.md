@@ -72,20 +72,75 @@ Pour utiliser la bibliothèque Modbus TCP, suivez ces étapes :
 4. Déconnectez-vous une fois terminé.
 
 #### Exemple :
+> [!NOTE]
+> Ce programme a été testé sur Windows 11 Pro x64 et Windows 7 x86, afin de garantir son fonctionnement avec .NET 3.5
 ```csharp
+using System;
 using ModbusTCPLibrary;
 
-var modbusTcp = new ModbusTCP();
-modbusTcp.Connect("192.168.1.15", 502);
+class Program
+{
+    static void Main()
+    {
+        // Créer une instance de la classe ModbusTCP
+        var modbusTcp = new ModbusTCP();
 
-// Lire 10 coils à partir de l'adresse 1
-bool[] coils = modbusTcp.ReadCoils(1, 10);
-Console.WriteLine("Coils lus : " + string.Join(", ", coils));
+        // Définir l'adresse IP et le port du dispositif Modbus TCP
+        string ipAddress = "192.168.1.15";
+        int port = 502;
 
-// Écrire un seul registre à l'adresse 1
-modbusTcp.WriteSingleRegister(1, 1234);
+        // Connexion initiale
+        try
+        {
+            Console.WriteLine("Connexion au dispositif Modbus TCP...");
+            modbusTcp.Connect(ipAddress, port);
+            Console.WriteLine("Connexion réussie !");
+        }
+        catch (Exception ex)
+        {
+            // Si la connexion échoue, afficher un message d'erreur et quitter le programme
+            Console.WriteLine("Erreur de connexion : " + ex.Message);
+            Console.WriteLine("Vérifiez l'adresse IP, le port et la connexion réseau.");
+            return; // Arrêter l'exécution du programme
+        }
 
-modbusTcp.Disconnect();
+        try
+        {
+            // Lire 10 coils à partir de l'adresse 1
+            bool[] coils = modbusTcp.ReadCoils(1, 10);
+
+            // Afficher les valeurs des coils lus
+            //conversion de coils a cause de .NET 3.5. ; Si .NET4.0+ Console.WriteLine("Coils lus : " + string.Join(", ", coils));
+            Console.WriteLine("Coils lus : " + string.Join(", ", Array.ConvertAll(coils, b => b.ToString())));
+
+            // Écrire un seul registre à l'adresse 1
+            modbusTcp.WriteSingleRegister(1, 1234);
+        }
+        catch (Exception ex)
+        {
+            // Gestion des erreurs (par exemple, déconnexion)
+            Console.WriteLine("Erreur : " + ex.Message);
+
+            // Tentative de reconnexion
+            Console.WriteLine("Tentative de reconnexion...");
+            try
+            {
+                modbusTcp.Reconnect(ipAddress, port);
+                Console.WriteLine("Reconnexion réussie !");
+            }
+            catch (Exception reconnectEx)
+            {
+                Console.WriteLine("Échec de la reconnexion : " + reconnectEx.Message);
+            }
+        }
+        finally
+        {
+            // Déconnexion garantie
+            modbusTcp.Disconnect();
+            Console.WriteLine("Déconnexion effectuée.");
+        }
+    }
+}
 ```
 ## Exemples Modbus TCP
 
@@ -200,6 +255,9 @@ modbusTcp.Disconnect(); // Déconnexion
 ```
 ## Modbus RTU
 
+> [!WARNING]
+> La classe ModbusRTU n’a pas encore été testée, contrairement à ModbusTCP. En théorie, le code fonctionne.
+
 Pour utiliser la bibliothèque Modbus RTU, suivez ces étapes :
 
 1. Créez une instance de la classe `ModbusRTU`.
@@ -209,20 +267,75 @@ Pour utiliser la bibliothèque Modbus RTU, suivez ces étapes :
 
 ### Exemple :
 ```csharp
+using System;
+using System.IO.Ports;
 using ModbusRTULibrary;
 
-var modbusRtu = new ModbusRTU();
-modbusRtu.Connect("COM1", 9600, Parity.None, 8, StopBits.One);
+class Program
+{
+    static void Main()
+    {
+        // Créer une instance de la classe ModbusRTU
+        var modbusRtu = new ModbusRTU();
 
-// Lire 5 registres de maintien à partir de l'adresse 1
-ushort[] holdingRegisters = modbusRtu.ReadHoldingRegisters(1, 1, 5);
-Console.WriteLine("Registres de maintien lus : " + string.Join(", ", holdingRegisters));
+        // Définir les paramètres de communication série
+        string portName = "COM1"; // Port série utilisé (ex: COM1, COM2, etc.)
+        int baudRate = 9600; // Vitesse de communication (baud rate)
+        Parity parity = Parity.None; // Parité (None, Even, Odd, Mark, Space)
+        int dataBits = 8; // Nombre de bits de données
+        StopBits stopBits = StopBits.One; // Nombre de bits de stop
 
-// Écrire plusieurs registres à partir de l'adresse 5
-ushort[] valeurs = { 100, 200, 300 };
-modbusRtu.WriteMultipleRegisters(1, 5, valeurs);
+        // Connexion initiale
+        try
+        {
+            Console.WriteLine("Connexion au dispositif Modbus RTU...");
+            modbusRtu.Connect(portName, baudRate, parity, dataBits, stopBits);
+            Console.WriteLine("Connexion réussie !");
+        }
+        catch (Exception ex)
+        {
+            // Si la connexion échoue, afficher un message d'erreur et quitter le programme
+            Console.WriteLine("Erreur de connexion : " + ex.Message);
+            Console.WriteLine("Vérifiez le port série, les paramètres et la connexion.");
+            return; // Arrêter l'exécution du programme
+        }
 
-modbusRtu.Disconnect();
+        try
+        {
+            // Lire 10 coils à partir de l'adresse 1 sur l'esclave avec l'ID 1
+            bool[] coils = modbusRtu.ReadCoils(1, 1, 10);
+
+            // Afficher les valeurs des coils lus
+            Console.WriteLine("Coils lus : " + string.Join(", ", Array.ConvertAll(coils, b => b.ToString()))); // Conversion pour .NET 3.5
+
+            // Écrire un seul registre à l'adresse 1 sur l'esclave avec l'ID 1
+            modbusRtu.WriteSingleRegister(1, 1, 1234);
+        }
+        catch (Exception ex)
+        {
+            // Gestion des erreurs (par exemple, déconnexion)
+            Console.WriteLine("Erreur : " + ex.Message);
+
+            // Tentative de reconnexion
+            Console.WriteLine("Tentative de reconnexion...");
+            try
+            {
+                modbusRtu.Reconnect(portName, baudRate, parity, dataBits, stopBits);
+                Console.WriteLine("Reconnexion réussie !");
+            }
+            catch (Exception reconnectEx)
+            {
+                Console.WriteLine("Échec de la reconnexion : " + reconnectEx.Message);
+            }
+        }
+        finally
+        {
+            // Déconnexion garantie
+            modbusRtu.Disconnect();
+            Console.WriteLine("Déconnexion effectuée.");
+        }
+    }
+}
 ```
 ## Exemples Modbus RTU
 ### Lire des coils
